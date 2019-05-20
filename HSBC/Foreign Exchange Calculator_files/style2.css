@@ -1,0 +1,96 @@
+/****************************************
+ * Created:		Feb 2012
+ * Updated:		February 09, 2012
+ */
+
+
+.hsbcTableStyle0
+{
+    margin-top: 20px;
+    margin-left: 20px;  
+}
+
+.hsbcTableStyle1
+{
+	border: 0px;
+    border-collapse: collapse;
+	width:450px;
+}
+
+.hsbcTableStyle2
+{
+	border: 1px solid #A2BFF4;
+    border-collapse: collapse;
+	width:450px;	
+}
+
+.hsbcTdStyle1
+{
+	border: 0px;
+    padding: 3px;
+	text-align:left;	
+	font-family:Arial,Helvetica,sans-serif;	
+	font-size:72%;	
+}
+
+.hsbcTdStyle2
+{
+	border: 1px solid #A2BFF4;
+    padding: 3px;
+	text-align:left;
+	font-family:Arial,Helvetica,sans-serif;	
+	font-size:72%;		
+}
+
+.hsbcTdStyle3
+{
+	border: 1px solid #A2BFF4;
+    padding: 3px;
+	text-align:left;
+	font-family:Arial,Helvetica,sans-serif;	
+	font-weight:bold;
+	font-size:72%;	
+	background-color:#EEEEEE;	
+}
+
+.hsbcErrorStyle
+{
+	color:#ff0000;
+	font-family:Arial,Helvetica,sans-serif;		
+	font-weight:bold;
+	font-size:100%;	
+}
+
+input, select, textarea {
+	 font-family: Arial,Helvetica,sans-serif;
+	 font-size:  100%;
+}
+
+h3{
+	font-family: Arial,Helvetica,sans-serif;
+	font-size:  100%;
+}
+
+/** HBCA OHI 1.5 sytle update add begin **/
+.hsbcTdStyle1 input{
+	border:1px solid;
+}
+
+.hsbcTdStyle1 select{
+	border:1px solid;
+}
+
+.hsbcTdStyle1 .noBorder{
+	border:0px none;
+}
+
+.hsbcTableStyle0 h3{
+	padding-bottom: 20px;
+}
+
+.hsbcTdStyleWidth{
+	width:40%;
+}
+
+/** HBCA OHI 1.5 sytle update add end   **/
+

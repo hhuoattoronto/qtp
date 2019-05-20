@@ -1,0 +1,11 @@
+// JavaScript Document
+$(document).ready(function () {
+// ---- FAQs ----------------------------------------------
+$('.faqs .answer').hide(); // Hide all answer content inside .faqs
+
+$('.faq-down').click(function(){ 
+$(this).next().slideToggle('normal'); // Toggle answers when the respective question is clicked
+ $(this).toggleClass("faq-up");
+});
+
+});

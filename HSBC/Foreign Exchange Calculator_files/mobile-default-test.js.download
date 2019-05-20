@@ -1,0 +1,1652 @@
+function say(msg) { if (typeof console != "undefined" && console.log) {try {console.log(msg);} catch(error){}}}
+/**
+ * @projectDescription: Bespoke functionality for the PWS build pack. All code to be within
+ * 'PWS' namespace. Reserved 'init' method for all objects - which is called implicitly for
+ * all second level objects.
+ */
+(function($){
+	$(document).ready(function(){
+		PWS.init();
+		respond.init();
+	});
+
+	var respond = {
+		state: 'desktop',
+		$window: $(window),
+
+		init: function() {
+			var self = this;
+
+			if(!(BrowserDetect.isIe() && BrowserDetect.getVersion() < 9)){
+				this.$window.bind('orientationchange resize', $.proxy(self._check, self));
+				self._check();
+			}
+
+			if (window.innerWidth <= PWS.mobileWidth) {
+				if (window.HSBC && HSBC.hasOwnProperty("SITE")) {
+					HSBC.SITE.screenlayout = "slim";
+				}
+				$('meta[name=viewport]').attr("content", "width="+PWS.mobileWidth);
+			
+			} else {
+				if (window.HSBC && HSBC.hasOwnProperty("SITE")) {
+					HSBC.SITE.screenlayout = "full";
+				}
+				$('meta[name=viewport]').attr("content", "width=device-width");
+			}
+
+		}, 
+
+		_check: function() {
+			var self = this,
+				newState;
+
+			if (this.timeout) {
+				clearTimeout(this.timeout);
+			}
+
+			this.timeout = setTimeout(function() {
+				if($(document.body).innerWidth() <= PWS.mobileWidth) {
+					newState = 'mobile';
+				} else {
+					newState = 'desktop';
+				}
+
+				if(newState !== self.state) {
+					self.$window.trigger('respond', [newState]);
+				}
+
+				self.checkRedirect();
+
+				self.state = newState;
+			}, 1000);
+
+		},
+		/**
+		 * Check body tag for mobile redirect attribute and redirect via content of attribute
+		 */
+		checkRedirect: function () {
+			var $html = $(document.documentElement),
+				mobileRedirect = $html.attr("data-mobile-redirect"),
+				desktopRedirect = $html.attr("data-desktop-redirect");
+
+			this.checkRedirect = function () {
+				//alert("Desktop:"+desktopRedirect+", Mobile:"+mobileRedirect+" "+window.innerWidth+" "+PWS.mobileWidth);
+				if (mobileRedirect && window.innerWidth <= PWS.mobileWidth) {
+					location.href = mobileRedirect;
+				} else if (desktopRedirect && window.innerWidth > PWS.mobileWidth) {
+					location.href = desktopRedirect;
+				}
+			}
+
+			this.checkRedirect();
+		}
+	},
+
+
+
+	/**
+	 * Main object. Contains high-level functionality and calls to lower level initialisation methods.
+	 */
+	PWS = {
+		mobileWidth: 640,
+		mobileParsed: false,
+
+		init: function(){
+			var self = this;
+			for(var i in PWS){
+				if(PWS[i].hasOwnProperty('init') && typeof(PWS[i].init) === 'function'){
+					PWS[i].init();
+				}
+			}
+
+			this.callPlugins();
+			this.callRevolver();
+
+			$(window).bind('respond', function(e, state) {
+				var $footerMap = $('#footerMap');
+				var $chooseType = $('ul.chooseType:first');
+				var $chooseSelect = $('.chooseSelect');
+				var $productFooter = $('#productFooter');
+
+				if(state === 'mobile') {
+					$('#hero').trigger('customrebuild', state === 'mobile');
+
+					if(self.mobileParsed === false) {
+						var tableHelpLink = $('table th .help a');
+						tableHelpLink.unbind('mouseover focusin mouseout focusout click');
+
+						tableHelpLink.click(function (e) {
+							e.preventDefault();
+							var $el = $(this).parents('th').find('div.helpText');
+
+							$el.toggle();
+							if($el.css('display') === 'block') {
+								$el.attr('aria-hidden', false);
+							} else {
+								$el.attr('aria-hidden', true);
+							}
+						});
+
+						$chooseType = $('ul.chooseType:first');
+						if($chooseType.length) {
+							$chooseSelect = $('<select class="chooseSelect">');
+							$('a', $chooseType).each(function(index, link) {
+								var $link = $(link),
+									value = $link.html().replace('<br>', ' ');
+								var $option = $('<option>' + value + '</option>');
+								$chooseSelect.append($option);
+
+							});
+
+							$chooseSelect.bind('change', function(e) {
+								showAccs($chooseSelect.get(0).selectedIndex);
+							});
+							$chooseType.after($chooseSelect);
+						}
+
+						var $footerMap = $('#footerMap');
+						$('.column', $footerMap).showHide({
+							trigger: 'h2',
+							content: 'ul'
+						});
+
+						var $productFooter = $('#productFooter');
+						$('.column', $productFooter).showHide({
+							trigger: 'h3',
+							content: 'ul, a.greyBtn, p, a.pdfLink, a.mobilePhone',
+							duration: 0
+						});
+
+						var $articles = $('.articles');
+						$articles.showHide({
+							trigger: 'h3',
+							content: 'ul'
+						});
+
+						var $featureBox = $('.featureBox');
+						$featureBox.showHide({
+							trigger: 'h2, h3, h4',
+							content: 'ul'
+						});
+
+						$(window).bind("load", function() {
+							var $gtnContent = $('.gtnContent');
+							$gtnContent.showHide({
+								trigger: 'h5',
+								content: '.gtnShowHide'
+							});
+						});
+
+						$footerMap.delegate('.column a[data-mobile-href]', 'click', function(e) {
+							if(respond.state !== 'mobile') return;
+							e.preventDefault();
+
+							var $el = $(this);
+							window.location.href = $el.data('mobile-href');
+						});
+						$('#grid').delegate('.grid a[data-mobile-href]', 'click', function(e) {
+							if(respond.state !== 'mobile') return;
+							e.preventDefault();
+
+							var $el = $(this);
+							window.location.href = $el.data('mobile-href');
+						});
+					}
+
+					
+
+					if($chooseSelect.length) {
+						$chooseType.hide();
+						$chooseSelect.show();
+					}
+
+
+					var $productTable = $('#productTable'),
+						$productTableChild = $productTable.children('table');
+
+					if($productTable.length){
+
+						new iScroll($productTable[0], {
+							hScrollbar: false,
+							bounce: false,
+							momentum: false,
+							onBeforeScrollStart: function(e){
+								if(this.dirY === 0){
+									e.preventDefault();
+								}
+							},
+							onScrollMove: function(){
+								$productTableChild.trigger('redraw');
+							},
+							onBeforeScrollEnd: function(){
+								$productTableChild.trigger('redraw');
+							},
+							onScrollEnd: function(){
+								$productTableChild.trigger('redraw');
+							}
+						});
+
+					}
+
+					self.mobileParsed = true;
+
+				} else if(state === 'desktop') {
+					$chooseType = $('ul.chooseType:first');
+					$chooseSelect = $('.chooseSelect');
+					if($chooseType.length) {
+						$chooseType.show();
+						$chooseSelect.hide();
+					}
+					$('.column ul', $footerMap).show().attr('aria-hidden', false);
+				}
+
+				//var $footerTrigger = $('.column h2', $footerMap).unbind('click');
+				/*if(state === 'mobile') {
+					$footerTrigger.bind('click', function(e) {
+						e.preventDefault();
+
+						var $el = $(this),
+							$col = $el.parents('.column');
+
+						$col.trigger('toggle.showHide');
+					});
+				}*/
+
+				self.swapImages(state);
+			});
+
+			if(BrowserDetect.isIe() && BrowserDetect.getVersion() < 7){
+				//background cache fix for ie6
+				var m = document.uniqueID && document.compatMode && !window.XMLHttpRequest && document.execCommand;
+				try{
+					if(!!m){
+						m("BackgroundImageCache", false, true);
+					}
+				}
+				catch(e){};
+			}
+
+			$(document.body).attr({
+				'aria-live': 'polite',
+				'aria-relevant': 'all'
+			});
+
+			$('.closeWin').click(function(e){
+				e.preventDefault();
+				window.close();
+			});
+			$('.printPage').click(function(e){
+				e.preventDefault();
+				window.print();
+			});
+		},
+		/**
+		 * Calls jQuery plugins.
+		 */
+		callPlugins: function(){
+			if($.fn.dataFilter){
+				$('#productSelector').dataFilter({
+					duration: 0,
+					filterElements: '#products tbody'
+				});
+				
+				$('#products div.handle').show();
+			}
+
+			if($.fn.tooltip){
+				$('#mortgageForm li label').each(function(){
+					$(this).tooltip({
+						selectors: {
+							trigger:	'.help a',
+							content:	'.tooltipContent'
+						},
+						classes: {
+							overlay: 	'tooltipContent'
+						},
+						fncs: {
+							getTop: function($overlay){
+								var top = $overlay.show().height();
+								return top * -1;
+							}
+						},
+						clickTriggered: false,
+						zIndexFromBottom: false
+					})
+					.find('.help  a').click(function(e){
+						e.preventDefault();
+					});
+				});
+			}
+
+			if($.fn.treeView){
+				$('#treeNav ul').treeView({
+					duration:0,
+					selectors: {
+						trigger: 'p'
+					},
+					addAriaWrapper: false
+				});
+
+				$('#treeNav').find('p a').attr('title', function(i, val){
+                	return 'Expand or collapse menu: ' + val
+                });
+			}
+
+		
+			/* removed May 22 2014 HSBC */	
+			/* var $heroCarousel = $('#hero');
+			if($.fn.infiniteCarousel){
+				$heroCarousel.infiniteCarousel();
+			}
+			if ($.fn.touchwipe){
+				$heroCarousel.touchwipe({
+					min_move_x: 350,
+					min_move_y: 80,
+					preventDefaultEvents: false,
+					preventEventPropagation: true,
+					wipeLeft: function(evt){
+						$heroCarousel.trigger('gotonextinfinitecarousel');
+					},
+					wipeRight: function(evt){
+						$heroCarousel.trigger('gotopreviousinfinitecarousel');
+					}
+				});
+			} */
+
+			if($.fn.customSelect){
+$('.customSelect').customSelect();
+}
+if($.fn.fixedTableCol) {
+var $fixedTables = $('.fixedTableCol').fixedTableCol();
+}
+$(window).bind('respond', function(e, state) {
+if(state === 'mobile') {
+if($('#mobileNavButton').hasClass('open') && !$('.pausePlay a').hasClass('paused')){
+setTimeout(function(){
+$('.pausePlay a').click();
+}, 100);
+}
+/* Testing fix for group carousel */
+//var $heroCarousel = $('#hero');
+$('#hero .carouselWrapper').find('li.cloned').remove();
+$('#hero .carouselWrapper').find('li').removeAttr('id');
+$('#hero .carouselWrapper a.carouselTab').removeAttr('id').removeAttr('style');
+$('#hero .carouselWrapper div.tabArticleText').removeAttr('style');
+$('#hero .carouselWrapper').removeAttr('class').addClass('flexslider').unbind();
+$('.flexslider ul').attr('id','slides').addClass('slides');
+$('#heroContainer').attr('id','mobileHeroContainer');
+$('#hero').attr('id','mobileHero');
+/* START - Move smaller banners to carousel *
+// Grid 12 (Double-wide)
+$("body[id*='Home']").find(".grid_12 .contentItem").each(function(){
+var mIMG = $(this).find('img');
+var mH2 = $(this).find('h2');
+var mLINK = $(this).find('a');
+//alert(mIMG);
+var mLI = $('<li/>',{
+"class" : 'moved'
+});
+var mDIV = $('<div/>',{
+"class" : 'tabArticleText alignLeft bgLight'
+})
+$(mIMG).appendTo(mLI);
+$(mH2).appendTo(mDIV);
+$(mLINK).appendTo(mDIV);
+$(mDIV).appendTo(mLI);
+$(mLI).appendTo('#slides');
+//$(this).remove();
+});
+$('body[id*="Home"]').find('.grid_12').remove();
+// Grid 6 (Double-wide)
+$('body[id*="Home"]').find('.grid_6 .contentItem').each(function(){
+var mIMG = $(this).find('img');
+var mH2C = $(this).find('h2 a').contents();
+var mLINKHREF = $(this).find('h2 a').attr("href");
+var mLINKTITLE = $(this).find('h2 a').attr("title");
+var mP = $(this).find('p');
+//var mLINK = $(this).find('h2 a').contents().last().replaceWith("Learn more");
+//alert(mIMG);
+var mLI = $('<li/>',{
+"class" : 'moved'
+});
+var mDIV = $('<div/>',{
+"class" : 'tabArticleText alignLeft bgLight'
+})
+var mH2 = $('<h2/>',{
+});
+var mLINK = $('<a/>',{
+"class" : 'greyBtn',
+href:mLINKHREF,
+title:mLINKTITLE,
+html: "<span>"+"Learn More"+"</span>"
+});
+$(mIMG).appendTo(mLI);
+$(mH2C).appendTo(mH2);
+$(mH2).appendTo(mDIV);
+$(mP).appendTo(mDIV);
+$(mLINK).appendTo(mDIV);
+$(mDIV).appendTo(mLI);
+$(mLI).appendTo('#slides');
+$(this).remove();
+});
+$('body[id*="Home"]').find('.grid_6').remove();
+/* END - Move smaller banners to carousel */
+$('.flexslider').flexslider({
+animation: "slide",
+touch: true
+});
+// set flexslider navigation position
+var slideNavWidth = $('#mobileHeroContainer .flex-control-nav').width();
+var sliderWidth = $('#mobileHeroContainer').width();
+var sliderNavPos = Math.round((sliderWidth - slideNavWidth)/2);
+$('#mobileHeroContainer .flex-control-nav').css('left',sliderNavPos+'px');
+} else {
+if($('.pausePlay a').hasClass('paused')){
+setTimeout(function(){
+$('.pausePlay a').click();
+}, 300);
+}
+}
+if($fixedTables) {
+$fixedTables.trigger('set-col-height:fixed-table-col');
+}
+});
+},
+callRevolver: function(){
+if($.fn.revolver){
+var $smallCarousel = $('#smallCarousel');
+if ($smallCarousel.length && $.fn.touchwipe){
+$smallCarousel.touchwipe({
+min_move_x: 300,
+min_move_y: 80,
+preventDefaultEvents: false,
+preventEventPropagation: true,
+wipeLeft: function(evt){
+$smallCarousel.trigger('wipeLeft');
+},
+wipeRight: function(evt){
+$smallCarousel.trigger('wipeRight');
+}
+});
+}
+if($smallCarousel.length && !$smallCarousel.hasClass('revolverActive')){
+$smallCarousel.revolver({
+interval: 0,
+duration: 1000,
+selectors: {
+item: '.revolverWindow .revolverBelt a',
+prev: '#galleryPrev',
+next: '#galleryNext',
+pager: '#galleryPager'
+},
+classes: {
+pagerItemSelected: 'selected'
+},
+addAriaWrapper: false
+});
+$smallCarousel
+.bind('onchangerevolver', function(e, i){
+$('#smallCarousel .revolverBelt a[data-index='+i+']').focus();
+})
+.bind('onchangerevolver', function(e, i){
+$('#smallCarousel .revolverBelt a[data-index='+i+']').focus();
+})
+.bind('onloadcompleterevolver', function(){
+controlLinks();
+})
+.bind('onabortrevolver', function(){
+$(this).find('.revolverNavigation').hide();
+})
+.find('.galleryControls').show();
+var controlLinks = function(){
+var controlLinks = $('div#smallCarousel .galleryControls a, .revolverNavigation li a'),
+borderColor = 'transparent';
+if(BrowserDetect.isIe() && BrowserDetect.getVersion() < 7){
+borderColor = '#fff';
+}
+controlLinks.each(function(){
+var alink = $(this);
+alink.mousedown(function(e){
+alink.css({'border-color':borderColor});
+});
+});
+}
+}
+}
+},
+		
+		callRevolver: function(){
+			/* removed Oct 01 2014 HSBC */
+			/*
+			if($.fn.revolver){
+				var $smallCarousel = $('#smallCarousel');
+
+				if ($smallCarousel.length && $.fn.touchwipe){
+					$smallCarousel.touchwipe({
+						min_move_x: 300,
+						min_move_y: 80,
+						preventDefaultEvents: false,
+						preventEventPropagation: true,
+						wipeLeft: function(evt){
+							$smallCarousel.trigger('wipeLeft');
+						},
+						wipeRight: function(evt){
+							$smallCarousel.trigger('wipeRight');
+						}
+					});
+				}
+
+				if($smallCarousel.length && !$smallCarousel.hasClass('revolverActive')){
+					$smallCarousel.revolver({
+						interval: 0,
+						duration: 1000,
+						selectors: {
+							item: '.revolverWindow .revolverBelt a',
+							prev: '#galleryPrev',
+							next: '#galleryNext',
+							pager: '#galleryPager'
+						},
+						classes: {
+							pagerItemSelected: 	'selected'
+						},
+						addAriaWrapper: false
+					});
+
+					$smallCarousel
+						.bind('onchangerevolver', function(e, i){
+							$('#smallCarousel .revolverBelt a[data-index='+i+']').focus();
+						})
+						.bind('onchangerevolver', function(e, i){
+							$('#smallCarousel .revolverBelt a[data-index='+i+']').focus();
+						})
+						.bind('onloadcompleterevolver', function(){
+							controlLinks();
+						})
+						.bind('onabortrevolver', function(){
+							$(this).find('.revolverNavigation').hide();
+						})
+						.find('.galleryControls').show();
+
+					var controlLinks = function(){
+						var controlLinks = $('div#smallCarousel .galleryControls a, .revolverNavigation li a'),
+							borderColor = 'transparent';
+
+						if(BrowserDetect.isIe() && BrowserDetect.getVersion() < 7){
+							borderColor = '#fff';
+						}
+
+						controlLinks.each(function(){
+							var alink = $(this);
+							alink.mousedown(function(e){
+								alink.css({'border-color':borderColor});
+							});
+						});
+					}
+				}
+
+			}
+			*/
+		},
+		
+		
+
+		swapImages: function(state) {
+			var $imgs = $('img')
+			
+			$('.mobileImages').each(function() {
+				var $img = $(this),
+					currentSrc = $img.attr('src'),
+					newSrc = '';
+
+				if(state === 'mobile') {
+					newSrc = currentSrc.replace('images', 'images/mobile');
+					$img.attr('src', newSrc);
+				} else {
+					newSrc = currentSrc.replace('images', 'images');
+					$img.attr('src', newSrc);
+				}
+			});
+		}
+
+	};
+
+	PWS.Header = {
+		init: function(){
+			this.Mobile.init();
+			/* moved Sep 18 2014
+			this.CountryList.init();
+			*/
+			this.callPlugins();
+			this.setMainNav();
+
+			this.setDropdowns($('#internetBanking'), $('#internetBanking').find('.links'));
+			this.setDropdowns($('#authenticate'), $('#logon'));
+		},
+		/**
+		 * Calls jQuery plugins.
+		 */
+		callPlugins: function(){
+			//search form
+			if($.fn.inputMsg){
+				$('#q').inputMsg();
+			}
+		},
+		/**
+		 * Sets the header drop downs.
+		 */
+		setDropdowns: function($trigger, $dropDown){
+			$dropDown.hide().attr('aria-hidden', true);
+			$trigger
+				.find('a:first').click(function(e) {
+					if(!respond.state === 'mobile') {
+						e.preventDefault();
+					} else {
+						return true;
+					}
+
+					if(!$(this).hasClass('loggedOn')){
+						if($(this).hasClass('on') && !$.contains($dropDown[0], e.target)){
+							hide();
+						}
+						else {
+							show();
+						}
+					}
+				})
+				.end()
+				.bind('mouseleave', function(){
+					$dropDown
+						.fadeOut('slow')
+						.attr('aria-hidden', true);
+					$trigger.removeClass('on');
+				})
+				.blur(function(){
+					hide();
+				});
+
+			var $links = $dropDown.find('a, input');
+
+			$dropDown.focusout(function(){
+				$(this).hasFocus(function(hasFocus){
+					if(!hasFocus){
+						hide();
+					}
+				});
+			});
+
+			function show(){
+				$trigger.addClass('on');
+				$dropDown
+					.fadeIn('slow')
+					.attr('aria-hidden', false);
+			}
+
+			function hide(){
+				$trigger.removeClass('on');
+				$dropDown
+					.fadeOut('slow')
+					.attr('aria-hidden', true);
+			}
+		},
+		/**
+		 * Sets navigation events for main nav
+		 */
+		setMainNav: function(){
+			var $mainNav = $('#sections > ul'),
+				$mainNavItems = $mainNav.find('.mainTopNav');
+
+			if($.fn.megaDropdown){
+				$mainNav.find('.doormat');
+
+				$mainNavItems
+					.attr('title', function(i, val){
+				  		return 'Expand menu: ' + val
+					})
+					.click(function(e){
+						e.preventDefault();
+					});
+
+				$mainNav.megaDropdown({
+					activeClass: 	'focused',
+					node:			'div.doormat',
+					addAriaWrapper: false
+				});
+			}
+
+			$('#sections p.skipLink a').click(function(e){
+				e.preventDefault();
+				$mainNav.trigger('closeallmegadropdown');
+				$(this).parents('li').next('li').find('a:eq(0)').focus();
+			});
+		}
+	};
+
+	PWS.Header.Mobile = {
+		$topLevel: null,
+		$mobileNavWrapper: null,
+		$mobileNav: null,
+		$mobileButton: null,
+		$level1: null,
+		$level2: null,
+		levelWidth: 640,
+		structure: {},
+
+		init: function() {
+			var self = this;
+
+			this.$topLevel = $('#topLevel');
+
+			this.structure.level1 = [];
+
+			//Level1
+			this.$topLevel.find('.level1').each(function() {
+				var $l1 = $(this),
+					$l1Link = $('a.mainTopNav', $l1),
+					level1Data = {
+						title: $l1Link.find('strong').eq(0).html(),
+						txt: $l1Link.html(),
+						directLink: '#',
+						level2: []
+					};
+
+				self.structure.level1.push(level1Data);
+
+				var mobileHref = $l1Link.attr('data-mobile-href');
+
+				if(mobileHref) {
+					level1Data.directLink = mobileHref;
+					level1Data.level2 = null;
+					return;
+				}
+
+				//Level2
+				var $level2 = $l1.find('.doormatLeft > ul > li:not(.mobileNav-Ignore)');
+
+				$level2.each(function() {
+					var $l2 = $(this),
+						$l2Header = $('p, h3', $l2).eq(0),
+						$l2HeaderLink = $('a', $l2Header),
+						level2Data = {
+							txt: $l2HeaderLink.html(),
+							directLink: '#'
+						};
+
+					level1Data.level2.push(level2Data);
+
+					var mobileHref = $l2HeaderLink.attr('data-mobile-href');
+
+					if(mobileHref) {
+						level2Data.directLink = mobileHref;
+					} else {
+						level2Data.directLink = $l2HeaderLink.attr('href');
+					}
+				});
+			});
+			this.build();
+			this.buildLevel1();
+
+
+			$(window).bind('respond', function(e, state) {
+				if(state === 'mobile') {
+					self.$mobileNavWrapper.show();
+				} else if(state === 'desktop') {
+					self.$mobileNavWrapper.hide();
+				}
+			});
+		},
+
+		build: function() {
+			var self = this,
+				mobileNav = '<div id="mobileNavWrapper"><a id="mobileNavButton"></a><div id="mobileNav"><div class="mobileNavBelt"><div class="level1"></div><div class="level2"></div><div class="level3"></div></div></div></div>'
+
+			this.$topLevel.before(mobileNav);
+			this.$mobileNavWrapper = $('#mobileNavWrapper');
+			this.$mobileNav = this.$mobileNavWrapper.find('#mobileNav');
+			this.$mobileNavAbsolute = $('.mobileNavBelt', this.$mobileNav);
+			this.$mobileButton = this.$mobileNavWrapper.find('#mobileNavButton');
+			this.$level1 = this.$mobileNav.find('.level1');
+			this.$level2 = this.$mobileNav.find('.level2');
+			this.$level3 = this.$mobileNav.find('.level3');
+
+			this.$mobileNavWrapper.showHide({
+				trigger: '#mobileNavButton',
+				content: '#mobileNav'
+			});
+
+			this.$mobileNavWrapper.bind('onstartopenshowhide', function(){
+				self.gotoLevel(1);
+				if(!$('.pausePlay a').hasClass('paused')){
+					$('.pausePlay a').click();
+				}
+			});
+
+			this.$mobileNavWrapper.bind('onstartcloseshowhide', function(){
+				if($('.pausePlay a').hasClass('paused')){
+					$('.pausePlay a').click();
+				}
+			});
+		},
+
+		buildLevel1: function() {
+			this.$level1.empty();
+			var self = this,
+				level1Str = '<ul>';
+
+			for(var i = 0; i < this.structure.level1.length; i++) {
+				var level1 = this.structure.level1[i],
+					classStr = '';
+
+				if (i === this.structure.level1.length - 1) {
+					classStr += ' class="last"';
+				}
+
+				level1Str += '<li'+ classStr +'><a href="' + level1.directLink + '" data-level-index="'+ i +'">'+ level1.txt +'</a></li>';
+			}
+
+			level1Str += '</ul>';
+
+			this.$level1.append(level1Str);
+
+			this.$level1.find('a').bind('click', function(e) {
+				var $this = $(this),
+					levelIndex = $this.attr('data-level-index');
+
+				if($this.attr('href') === '#') {
+					e.preventDefault();
+					self.buildLevel2(levelIndex);
+					self.gotoLevel(2);
+				}
+			});
+		},
+
+		buildLevel2: function(index) {
+			this.$level2.empty();
+
+			var self = this,
+				l1 = this.structure.level1[index],
+				level2Str = '<a href="#" class="mobileNavBackButton"></a> <p class="mobileNavTitle">'+ l1.title +'</p>' +
+				'<ul>'
+
+
+			for(var i = 0; i < l1.level2.length; i++) {
+				var level2 = l1.level2[i],
+					classStr = '';
+
+				if (i === l1.level2.length - 1) {
+					classStr += ' class="last"';
+				}
+
+				level2Str += '<li'+ classStr +'><a href="' + level2.directLink + '">'+ level2.txt +'</a></li>';
+			}
+
+
+			level2Str += '</ul>';
+
+			this.$level2.append(level2Str);
+
+			this.$level2.find('.mobileNavBackButton')
+				.unbind('click')
+				.bind('click', function(e) {
+					var $this = $(this);
+					e.preventDefault();
+
+					self.gotoLevel(1);
+				});
+		},
+
+		gotoLevel: function(level) {
+			var toLeft = -(this.levelWidth * (level-1));
+
+			this.$mobileNavAbsolute.animate({
+				'margin-left': toLeft
+			}, 500);
+		}
+
+	};
+	
+	
+	/* 
+	PWS.Header.CountryList = {
+		$trigger: null,
+		$dropDown: null,
+		init: function(){
+			var self = this;
+
+			this.setRegionTabs();
+
+			this.$trigger = $("#locale .dropDownLink")
+				.attr('aria-controls', '#dropDown');
+
+			this.$dropDown = $('#dropDown')
+				.hide()
+				.addClass('showDropDown');
+
+			this.$trigger.click(function(e) {
+				e.preventDefault();
+				self.toggleDropDown();
+			});
+
+			this.$dropDown.bind('mouseleave', function(){
+				self.hide();
+			});
+
+			this.$dropDown.focusout(function(){
+				$(this).hasFocus(function(hasFocus){
+					if(!hasFocus){
+						self.hide();
+					}
+				});
+			});
+
+			this.$dropDown.find('p.skipLink a').click(function(e){
+				e.preventDefault();
+                self.hide();
+                self.$trigger.focus();
+			});
+		},
+		
+		
+		/**
+		 * Toggles country list drop down.
+		*/
+		
+		/*toggleDropDown: function(){
+			if(this.$trigger.hasClass('on')){
+				this.hide();
+			}
+			else{
+				this.show();
+			}
+		},
+		*/
+		/**
+		 * show
+		*/
+		/*
+		show: function(){
+			this.$trigger.addClass('on');
+			this.$dropDown.fadeIn('slow')
+				.attr('aria-expanded', true)
+				.parent().css('z-index', '20')
+				.find('select').css('visibility', 'hidden');
+
+			this.$dropDown.find('a:eq(1)').focus();
+		},
+		*/
+		/**
+		 * hide
+		 */
+		
+		/*hide: function(){
+			this.$trigger.removeClass('on');
+			this.$dropDown.fadeOut('slow')
+				.attr('aria-expanded', false)
+				.parent().css('z-index', '1')
+				.find('select').css('visibility', 'visible');
+		},
+		*/
+		/**
+		 * Creates Region tabs and sets change events.
+		 */
+		/*
+		setRegionTabs: function(){
+			var $dropDownBody = $('#dropDownBody'),
+				$tabs = $('<ul class="regionTabs"></ul>'),
+				$regions = $dropDownBody.find('.region');
+
+
+			$dropDownBody.find('.region').each(function(i){
+				var $region = $(this),
+					$tab = $('<li><a title="' + $region.find('h3').text() + ': Click to view HSBC websites in this region" class="' + $region.attr('id') + '" href="#">' + $region.find('h3').text() + '</a></li>')
+						.appendTo($tabs)
+						.click(function(e){
+							e.preventDefault();
+							changeRegion(i, true);
+						});
+			});
+
+			$dropDownBody.prepend($tabs);
+
+			changeRegion(0);
+			function changeRegion(index, click){
+				$regions
+					.hide()
+					.attr('aria-hidden', true);
+				$regions.eq(index)
+					.show()
+					.attr('aria-hidden', false);
+
+				if(click){
+					$regions.eq(index).find('a:first').focus();
+				}
+
+				$tabs.find('li').removeClass('selected');
+				$tabs.find('li').eq(index).addClass('selected');
+			}
+		}
+	};
+	
+	*/
+
+	PWS.ProductNav = {
+		$productNav: null,
+		$dropDowns: null,
+		init: function(){
+			var self = this;
+
+			this.$productNav = $('#productNav');
+			this.$dropDowns = this.$productNav.find('li ul.dropDown');
+
+			this.$dropDowns
+				.hide()
+				.attr('aria-hidden', true);
+
+			this.$productNav.find('#shareTab').css('display', 'block');
+
+			this.$productNav.find('#printTab').css('display', 'block');
+
+			this.$productNav.find('li a.acctService').click(function(e){
+				e.preventDefault();
+
+				self.hide();
+				self.show($(this).siblings('.dropDown'));
+			});
+
+			this.$productNav.children('ul').children('li').mouseleave(function(){
+				self.hide();
+			});
+
+			this.$dropDowns.focusout(function(){
+				$(this).hasFocus(function(hasFocus){
+					if(!hasFocus){
+						self.hide();
+					}
+				});
+			});
+
+			this.ieStyles();
+		},
+		/**
+		 * Applies IE-specific styles when interacting with productNav.
+		 */
+		ieStyles: function(){
+			var self = this;
+			if(BrowserDetect.isIe()){
+				var $innerPage = $('#innerPage');
+
+				this.$productNav.find('li a.acctService').click(function(){
+					$innerPage.css('z-index', '20');
+					self.$productNav.parent().css('z-index', '100');
+				});
+
+				this.$productNav.find('li').bind('mouseleave focusout',function(){
+					$innerPage.css('z-index', '1');
+					self.$productNav.parent().css('z-index', '1');
+				});
+
+				$('#grid').focusin(function() {
+					$innerPage.css('z-index', '1');
+					self.$productNav.parent().css('z-index', '1');
+				});
+
+				this.$productNav.focusin(function() {
+					$innerPage.css('z-index', '1');
+					self.$productNav.parent().css('z-index', '1');
+				});
+			}
+		},
+		/**
+		 * Shows a dropdown menu.
+		 * @param {jQuery object} $dropDown - the dropdown menu to show.
+		 */
+		show: function($dropDown){
+			$dropDown
+				.show()
+				.attr('aria-hidden', false);
+
+			if($dropDown.parent().hasClass('on')){
+				$dropDown.parent()
+					.removeClass('on')
+					.addClass('active');
+			}
+			$dropDown.parent().addClass('open');
+		},
+		/**
+		 * Hides all dropdown menus
+		 */
+		hide: function(){
+			this.$dropDowns
+				.hide()
+				.attr('aria-hidden', true);
+
+			this.$productNav.children('ul').children('li').each(function(){
+				$(this).removeClass('open');
+				if($(this).hasClass('active')){
+					$(this)
+						.removeClass('active')
+						.addClass('on');
+				}
+			});
+		}
+	};
+
+	PWS.ProductComparison = {
+		init: function(){
+			var $list = $('#productTabs'),
+				$listItems = $list.find('li'),
+				$select,
+				$selectWrapper,
+				self = this;
+
+			$list.before('<div id="mobileProductTabsWrapper" class="customSelect"><select id="mobileProductTabs"></select></div>');
+			$selectWrapper = $('#mobileProductTabsWrapper');
+			$select = $selectWrapper.find('#mobileProductTabs').show();
+
+			$listItems.each(function(index) {
+				var $this = $(this),
+					$anchor = $this.find('a:first'),
+					text = $anchor.attr('title');
+				$select.append('<option value="' + index + '">' + text + '</options>');
+				$anchor.click(function(evt){
+					$select.find('option').removeAttr('selected');
+					$select.find('option').eq(index).attr('selected', 'selected');
+					$selectWrapper.trigger('changecustomselect', index);
+					self.fixTable();
+				});
+			});
+
+			$selectWrapper.bind('onchangecustomselect', function(evt, selectedIndex){
+				$select.find('option').removeAttr('selected');
+				$select.find('option').eq(selectedIndex).attr('selected', 'selected');
+				$listItems.removeClass('selected');
+				$listItems.eq(selectedIndex).addClass('selected');
+				$('#productSelector').trigger('updateview', selectedIndex);
+				self.fixTable();
+			});
+			
+			if(respond.state === 'mobile') {
+				$selectWrapper.show();
+				$list.hide();
+			} else {
+				$selectWrapper.hide();
+				$list.show();
+			}
+
+			$(window).bind('respond', function(e, state) {
+				if(state === 'mobile') {
+					$selectWrapper.show();
+					$list.hide();
+					self.fixTable();
+				} else if(state === 'desktop') {
+					$selectWrapper.hide();
+					$list.show();
+					self.fixTable();
+				}
+			});
+
+			this.paintZebraStripes();
+			this.pluginCalls();
+		},
+		/**
+		 * fixTable (checks no plugins have broken the table)
+		 */
+		fixTable: function(){
+			if(respond.state === 'mobile'){
+				displaySettingToRemove = 'table-row-group';
+				displaySettingToSet = 'block';
+			} else {
+				displaySettingToRemove = 'block';
+				displaySettingToSet = 'table-row-group';
+			}
+			var $tbodies = $('#products').find('tbody');
+			var theFunc = function() {
+				$tbodies.each(function(i, tableBody){
+					if ($(tableBody).css('display') === displaySettingToRemove){
+						$(tableBody).css('display', displaySettingToSet);
+					}
+				});
+			}
+			theFunc();
+			setTimeout(theFunc, 100);
+		},
+		/**
+		 * Calls jQuery plugins.
+		 */
+		pluginCalls: function(){
+			if($.fn.showHide){
+				$('#productComparison td').showHide({
+					activeClass: 	'open',
+					trigger: 		'a.more',
+					content: 		'p.moreContent',
+					addAriaWrapper: false,
+					update: [{selector:'a.more', text:['Show less', 'Show more']}]
+				});
+			}
+		},
+		/**
+		 * Adds 'odd' and 'even' classes to <th> and <td> tags.
+		 */
+		paintZebraStripes: function(){
+			$('#productComparison tr, #businessProductTable tr.rowContent')
+				.find('th:odd,td:odd').addClass('odd')
+				.end()
+				.find('th:even,td:even').addClass('even')
+				.end()
+				.find('td:first-child, th:first-child').removeClass('odd even');
+		}
+	};
+
+	PWS.Lightboxes = {
+		$activeTrigger: null,
+		lightboxArray: [],
+		init: function(){
+			var self = this;
+
+			this.lightboxArray = [
+				{
+					$content: $('#lightviewDetails'),
+					$trigger: $('.triggerModalDetails')
+				},
+				{
+					$content: $('#lightviewDetails01'),
+					$trigger: $('.triggerModalDetails01')
+				},
+				{
+					$content: $('#lightviewDetails02'),
+					$trigger: $('.triggerModalDetails02')
+				},
+				{
+					$content: $('#lightviewDetails03'),
+					$trigger: $('.triggerModalDetails03')
+				},
+				{
+					$content: $('#lightviewDetails04'),
+					$trigger: $('.triggerModalDetails04')
+				},
+				{
+					$content: $('#lightviewDetails05'),
+					$trigger: $('.triggerModalDetails05')
+				},
+				{
+					$content: $('#lightviewDetails06'),
+					$trigger: $('.triggerModalDetails06')
+				},
+				{
+					$content: $('#lightviewDetails07'),
+					$trigger: $('.triggerModalDetails07')
+				},
+				{
+					$content: $('#lightviewDetails08'),
+					$trigger: $('.triggerModalDetails08')
+				},
+				{
+					$content: $('#lightviewDetails09'),
+					$trigger: $('.triggerModalDetails09')
+				},
+				{
+					$content: $('#lightviewDetails10'),
+					$trigger: $('.triggerModalDetails10')
+				},
+				{
+					$content: $('#lightviewDetails11'),
+					$trigger: $('.triggerModalDetails11')
+				},
+				{
+					$content: $('#lightviewDetails12'),
+					$trigger: $('.triggerModalDetails12')
+				},
+				{
+					$content: $('#lightviewDetails13'),
+					$trigger: $('.triggerModalDetails13')
+				},
+				{
+					$content: $('#lightviewDetails14'),
+					$trigger: $('.triggerModalDetails14')
+				},
+				{
+					$content: $('#lightviewDetails15'),
+					$trigger: $('.triggerModalDetails15')
+				},
+				{
+					$content: $('#lightviewDetails16'),
+					$trigger: $('.triggerModalDetails16')
+				},
+				{
+					$content: $('#lightviewDetails17'),
+					$trigger: $('.triggerModalDetails17')
+				},
+				{
+					$content: $('#lightviewDetails18'),
+					$trigger: $('.triggerModalDetails18')
+				},
+				{
+					$content: $('#lightviewDetails19'),
+					$trigger: $('.triggerModalDetails19')
+				},
+				{
+					$content: $('#lightviewDetails20'),
+					$trigger: $('.triggerModalDetails20')
+				},
+				{
+					$content: $('#lightviewProposition'),
+					$trigger: $('.triggerModalProposition'),
+					callback: function(){
+						PWS.callRevolver();
+					}
+				},
+				{
+					$content: $('#lightviewProduct'),
+					$trigger: $('.triggerModalProduct')
+				}
+			];
+
+			var handleTriggers = function(arrayItem){
+				arrayItem.$content
+					.attr('aria-hidden', true)
+					.find('.lightview').prepend('<a href="#" class="anchor" />')
+					.end()
+					.find('.close a').click(function(e){
+						e.preventDefault();
+						self.hide(arrayItem.$content);
+					});
+
+				arrayItem.$trigger.click(function(e){
+					e.preventDefault();
+					self.$activeTrigger = $(this);
+					self.show(arrayItem.$content, $(this));
+					if(typeof arrayItem.callback === 'function'){
+						arrayItem.callback();
+					}
+				});
+
+				if(arrayItem.$trigger.hasClass('ajaxLightbox')){
+					self.getContent(arrayItem.$trigger, arrayItem.$content);
+				}
+			};
+
+			for(var i=0; i<this.lightboxArray.length; i++){
+				handleTriggers(this.lightboxArray[i]);
+			}
+		},
+		/**
+		 * Makes an AJAX request for lightbox content.
+		 * @param: {jQuery object} $trigger - lightbox trigger
+		 * @param: {jQuery object} $content - lightbox content
+		 */
+		getContent: function($trigger, $content, callback){
+			var self = this,
+				url = $trigger.attr('href'),
+				containers = [];
+
+			$content.find('.ajaxContent').each(function(){
+				containers.push($(this).attr('id'));
+			});
+
+			$.get(url, function(data){
+				for(var i=0; i<containers.length; i++){
+					$(data).find('#' + containers[i].substr(5)).each(function(){
+						$content.find('#' + containers[i]).append($(this));
+						if($content.find('.pageTabs').length){
+							self.getTabContent($content);
+						}
+					});
+				}
+			});
+		},
+		/**
+		 *
+		 */
+		getTabContent: function($content){
+			var $tabs = $content.find('.pageTabs li'),
+				$tabContent = $content.find('.tabContent');
+
+			$tabs.each(function(i){
+				if(i > 0){
+					$.get($(this).find('a').attr('href'), function(data){
+						$tabContent.append($(data).find('#overlayContentFull'));
+						if($tabContent.children().length === $tabs.length){
+							PWS.Tabs.build($tabs, $tabContent.children());
+						}
+					});
+				}
+			});
+		},
+		/**
+		 * Shows a lightbox and appends the overlay.
+		 * @param: {jQuery object} $content - lightbox to show
+		 */
+		show: function($content, $trigger){
+			var self = this,
+				$overlay = $('<div class="overlay" />')
+				.css({
+					height:$(document).height(),
+					width:$(document).width()
+				})
+				.appendTo($('body')),
+				$lightboxLinks =  $content.find('a');
+
+			$overlay.click(function(){
+				self.hide($content);
+			});
+
+			$content.show();
+			$content
+				.css({
+					left: ($(window).width()-$content.width())/2,
+					top: $(window).scrollTop() + ($(window).height()-$content.height())/2
+				})
+				.attr('aria-hidden', false);
+
+			//focus first link
+			$lightboxLinks.eq(0).focus();
+
+			$lightboxLinks.last().blur(function(){
+				$lightboxLinks.eq(1).focus();
+			});
+
+			//append anchor to stop browser tabbing into furniture.
+			$content.append('<a href="#" />');
+
+			//attach esc key to close lightbox
+			$(document).keydown(function(e){
+				if(e.which === 27){
+					if($content.is(":visible")){
+						self.hide($content);
+					}
+				}
+			});
+
+			$('#top').css({
+				position: 'relative',
+				zIndex: 1
+			});
+		},
+		/**
+		 * Hides a lightbox and removes the overlay.
+		 * @param: {jQuery object} $content - lightbox to hide
+		 */
+		hide: function($content){
+			$content
+				.hide()
+				.attr('aria-hidden', true);
+			$('.overlay').remove();
+			this.$activeTrigger.focus();
+		}
+	};
+
+	PWS.Tabs = {
+		build: function($tabs, $tabNodes){
+			var self = this;
+
+			$tabs.find('a').each(function(i){
+				$(this).click(function(e){
+					e.preventDefault();
+					self.change(i, $tabs, $tabNodes);
+				});
+			});
+
+			this.change(0, $tabs, $tabNodes);
+		},
+		change: function(index, $tabs, $tabNodes){
+			$tabNodes.attr('aria-hidden', true).hide();
+			$tabNodes.eq(index).attr('aria-hidden', false).show();
+			$tabs.removeClass('selected');
+			$tabs.eq(index).addClass('selected');
+		}
+	};
+
+	/**
+	 * Contains site-wide code for better accessiblity.
+	 */
+	PWS.Accessiblity = {
+		init: function(){
+			this.skipLinks();
+			this.removeTabStyles();
+			this.applyIeClasses();
+		},
+		/**
+		 * Applies classes to IE.
+		 */
+		applyIeClasses: function(){
+			if(BrowserDetect.isIe()){
+				$('input').each(function(){
+					if($(this).attr('type') === 'text' && BrowserDetect.getVersion() < 8){
+						$(this)
+							.focus(function(){
+								$(this).addClass('ieTextFocus');
+							})
+							.blur(function(){
+								$(this).removeClass('ieTextFocus');
+							});
+					}
+					else if($(this).attr('type') === 'submit'){
+						if(BrowserDetect.getVersion() < 8){
+							$(this)
+								.focus(function(){
+									$(this).addClass('ieSubmitFocus');
+								})
+								.blur(function(){
+									$(this).removeClass('ieSubmitFocus');
+								});
+						}
+
+						if(BrowserDetect.getVersion() < 7){
+							$(this).hover(function(){
+								$(this).addClass('ieSubmitHover');
+							}, function(){
+								$(this).removeClass('ieSubmitHover');
+							});
+						}
+					}
+				});
+			}
+		},
+		/**
+		 * Implements skip-link functionality.
+		 */
+		skipLinks: function(){
+			var $firstLink = $('#innerPage a:eq(0)'),
+				$level1List = $("#sections li.level1");
+
+			$('li.skipLink a').click(function(e) {
+				e.preventDefault();
+				$firstLink.focus();
+			});
+
+			$('p.skipLinkLast a').click(function(e) {
+				e.preventDefault();
+				$level1List
+					.removeClass('focused')
+					.find('div.doormat')
+						.removeClass('showdoormat')
+						.attr('aria-hidden', true);
+				$firstLink.focus();
+			});
+
+			if(BrowserDetect.isIe()){
+				$('#skip')
+					.bind('focusin', function(){
+						$(this).addClass('ieSkip');
+						$(this).removeClass('skip');
+					})
+					.bind('focusout', function(){
+						$(this).removeClass('ieSkip');
+						$(this).addClass('skip');
+					});
+			}
+		},
+		/**
+		 * Removes styles applied when using tabs to navigate on mousedown.
+		 */
+		removeTabStyles: function(){
+			var $noTextDecoration = $(
+					'div#mainTopUtility #tabs a,' +
+					'div#mainTopUtility #locale a,' +
+					'div#mainTopUtility #onlineBanking a.ibLink,' +
+					'div#mainTopUtility #onlineBanking a.button,' +
+					'a.mainTopNav,' +
+					'a.hasMore,' +
+					'a.carouselTab,' +
+					'.pageTabs li a,' +
+					'.pageTabs li a span,' +
+					'div.langList a,' +
+					'#dropDown .regionTabs li a,' +
+					'a.greyBtn,' +
+					'a.greyBtn span,' +
+					'a.redBtn,' +
+					'a.redBtn span'
+				),
+				$noOutline = $(
+					'div#logo a,' +
+					'div#grid a,' +
+					'.jqmWindow .close a span,' +
+					'form #products .productInfo td input,' +
+					'#businessProductTable td input,' +
+					'#productSet .options .filter label input,' +
+					'.jqmWindow a'
+				),
+				$whiteBorder = $(
+					'div.propositionRow .promo a,' +
+					'div.bannerItem a'
+				);
+
+			$noTextDecoration.mousedown(function(){
+				$(this).css('text-decoration', 'none');
+			});
+
+			$noOutline.mousedown(function(){
+				$(this).css('outline', '0');
+			});
+
+			$whiteBorder.mousedown(function(){
+				$(this).css('border-color', '#fff');
+			});
+
+			$('div#smallCarousel .galleryControls a').mousedown(function(e){
+				$(this).css('border-color', 'transparent');
+			});
+
+			$('#mortgageForm span.help a').mousedown(function(e){
+				$(this).css('border-color', '#e4e4e4');
+			});
+
+			$('#grid .pillarAdvance a.pillarArrow').mousedown(function(e){
+				$(this).css('border-color', '#7b7b7b');
+			});
+
+			$('#grid .pillarPremier a.pillarArrow').mousedown(function(e){
+				$(this).css('border-color', '#181236');
+			});
+
+			$('div.doormat .info a').mousedown(function(e){
+				$(this).css('border-color', '#626469');
+			});
+
+			$('input[type="submit"]').mousedown(function(e){
+				$(this).css({'border':'0', 'outline':'0'});
+			});
+		}
+	};
+	
+})(jQuery);
