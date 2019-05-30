@@ -1,0 +1,13 @@
+Dim filename, fso, f, CsvValue
+filename="C:\Users.csv"
+
+Set fso=CreateObject("scripting.filesystemobject")
+Set f  = fso.OpenTextFile(filename)
+
+While not f.AtEndOfStream
+	For Each CsvValue In split(f.ReadLine, ",")
+		Print CsvValue
+	Next
+Wend
+f.Close
+Set fso=Nothing
