@@ -1,0 +1,17 @@
+Dim filename, fso, f, csvValues
+filename="C:\Users.csv"
+
+Set fso=CreateObject("scripting.filesystemobject")
+Set f  = fso.OpenTextFile(filename)
+
+While not f.AtEndOfStream
+	csvValues = split(f.ReadLine, ",")
+	SystemUtil.Run("C:\Program Files\HP\QuickTest Professional\samples\flight\app\flight4a.exe")
+	Dialog("Login").Activate
+	Dialog("Login").WinEdit("Agent Name:").Set csvValues(0)
+	Dialog("Login").WinEdit("Password:").Set csvValues(1)
+	Dialog("Login").WinButton("OK").Click
+	Window("Flight Reservation").Close
+Wend
+f.Close
+Set fso=Nothing
